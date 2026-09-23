@@ -151,6 +151,11 @@ func StartTunnel(
 
 	// Will be closed when the tunnel has successfully connected
 	connectedSignal := make(chan struct{})
+	// connectedSignal is closed on the first "Tunnels" notice with count > 0.
+	// tunnel-core emits that notice more than once during normal operation (e.g.
+	// when additional tunnels register after a remote server list download), so
+	// the close must be guarded to avoid "close of closed channel" panics.
+	connectedSignalOnce := &sync.Once{}
 	// Will receive a value if an error occurs during the connection sequence
 	erroredCh := make(chan error, 1)
 
@@ -192,7 +197,7 @@ func StartTunnel(
 			} else if event.Type == "Tunnels" {
 				count := event.Data["count"].(float64)
 				if count > 0 {
-					close(connectedSignal)
+					connectedSignalOnce.Do(func() { close(connectedSignal) })
 				}
 			}
 
