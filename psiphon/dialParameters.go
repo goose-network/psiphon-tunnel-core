@@ -1832,6 +1832,22 @@ func MakeDialParameters(
 		UpstreamProxyErrorCallback:    upstreamProxyErrorCallback,
 	}
 
+	// Route the tunnel's direct TCP connection to the Psiphon server through
+	// the host-application dialer, when one was set with
+	// Config.SetCustomDialer. Scope: only protocols that dial the server
+	// directly over TCP. Excluded: QUIC (UDP; NewUDPConn rejects
+	// DialConfig.CustomDialer), meek/fronted (CDN round-trip dials with their
+	// own resolver semantics; the fronting dial parameters build a separate
+	// DialConfig anyway), and in-proxy/light-proxy (they assign their own
+	// CustomDialer below, overriding this one). Tactics dials are left on the
+	// default dialer.
+	if !isTactics &&
+		config.hostCustomDialer != nil &&
+		protocol.TunnelProtocolUsesTCP(dialParams.TunnelProtocol) &&
+		!protocol.TunnelProtocolUsesMeek(dialParams.TunnelProtocol) {
+		dialParams.dialConfig.CustomDialer = config.hostCustomDialer
+	}
+
 	// Unconditionally initialize MeekResolvedIPAddress, so a valid string can
 	// always be read.
 	dialParams.MeekResolvedIPAddress.Store("")

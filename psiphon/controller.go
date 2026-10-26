@@ -1762,6 +1762,17 @@ func (controller *Controller) numTunnels() (int, int) {
 	return active, outstanding
 }
 
+// HasActiveTunnel reports whether the controller currently has at least one
+// registered, active tunnel. Embedders that drive the Controller directly —
+// rather than through the ClientLibrary's notice plumbing — can poll this to
+// await tunnel establishment without attributing global "Tunnels" notices to
+// a specific controller.
+func (controller *Controller) HasActiveTunnel() bool {
+	controller.tunnelMutex.Lock()
+	defer controller.tunnelMutex.Unlock()
+	return len(controller.tunnels) > 0
+}
+
 // terminateTunnel removes a tunnel from the pool of active tunnels
 // and closes the tunnel. The next-tunnel state used by getNextActiveTunnel
 // is adjusted as required.

@@ -1412,6 +1412,9 @@ type Config struct {
 	authorizations     []string
 
 	hostDeviceBinder DeviceBinder
+	// hostCustomDialer is the host-application dialer set with
+	// SetCustomDialer; see that method's comment for scope.
+	hostCustomDialer common.Dialer
 	splitInterface   *splitInterfaceState
 	networkIDGetter  *cachingNetworkIDGetter
 
@@ -4764,6 +4767,28 @@ type splitInterfaceState struct {
 	downstreamDeviceBinder  DeviceBinder
 	upstreamInterfaceName   string
 	downstreamInterfaceName string
+}
+
+// SetCustomDialer sets a host-application dialer for the underlying TCP
+// connections a tunnel dials directly to its Psiphon server — the SSH,
+// OSSH, TLS-OSSH and Shadowsocks protocols. Those dials are then made
+// through dialer instead of the host OS, which lets an embedding app
+// govern the tunnel's layer-3/4 transport (its own network stack, socket
+// accounting, or routing).
+//
+// The dialer is deliberately NOT applied to: QUIC and other UDP transports
+// (they require a *net.UDPConn, not the net.Conn a common.Dialer returns,
+// and DialConfig.CustomDialer is rejected by NewUDPConn); meek and fronted
+// protocols (they dial a CDN round-trip target and depend on the config's
+// own ResolveIP semantics for pre-resolved addresses); and untunneled
+// traffic such as remote server list and upgrade downloads (which may use
+// untunneled meek over UDP). In-proxy and light-proxy protocols install
+// their own DialConfig.CustomDialer, which takes precedence.
+//
+// The dialer receives dial addresses that may be domains; it is expected to
+// resolve them. Call before Commit; the dialer is not JSON-serialized.
+func (config *Config) SetCustomDialer(dialer common.Dialer) {
+	config.hostCustomDialer = dialer
 }
 
 // deviceBinder returns the default DeviceBinder for dials. In
